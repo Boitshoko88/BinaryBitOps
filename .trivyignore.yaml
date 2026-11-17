@@ -1,0 +1,26 @@
+# Narrow, justified Trivy suppressions for partial deployment patches.
+#
+# The rendered Deployment is derived from deploy/base/deployment.yaml, which is
+# scanned and covered by tests/test_manifests.py (read-only root filesystem,
+# non-root UID, dropped capabilities, RuntimeDefault seccomp). The files below
+# are fragment patches that intentionally contain only the changed fields, so
+# Trivy cannot see the inherited security context.
+misconfigurations:
+  - id: KSV-0014
+    paths:
+      - deploy/overlays/nonprod/patch-image.yaml
+      - vault/external-secret.yaml
+    statement: >-
+      Partial patch/alternative manifest. The rendered Deployment sets
+      readOnlyRootFilesystem true in deploy/base/deployment.yaml, which is
+      scanned separately and asserted by tests.
+  - id: KSV-0118
+    paths:
+      - deploy/overlays/nonprod/patch-image.yaml
+      - deploy/overlays/nonprod/patch-vault.yaml
+      - deploy/overlays/nonprod/patch-pull-secret.yaml
+      - vault/external-secret.yaml
+    statement: >-
+      Partial patch/alternative manifest. Pod and container security contexts
+      are inherited from deploy/base/deployment.yaml, which is scanned
+      separately and asserted by tests.
