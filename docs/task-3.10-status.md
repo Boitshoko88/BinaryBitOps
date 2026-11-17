@@ -4,6 +4,7 @@
 - Branch: `feature/task-3.10-demonstrator`
 - Repository: `Boitshoko88/BinaryBitOps` (fork of `mahlatse932/BinaryBitOps`)
 - Base commit: `06ef3b0`
+- Pull request: [#1](https://github.com/Boitshoko88/BinaryBitOps/pull/1) — open, PR check green
 
 ## Decision
 
@@ -47,18 +48,19 @@ contains host and timestamp data; regenerate it on the reviewing machine.
 | kubeconform `-strict` | 8 valid, 0 invalid, 1 skipped (ServiceMonitor CRD) |
 | Trivy fs (`vuln,secret,misconfig`, HIGH/CRITICAL) | 0 HIGH/CRITICAL, 0 secrets |
 | HTTP smoke tests against the running service | 15 passed, 0 failed |
-| Container build and image scan | **Skipped** — no reachable Docker daemon |
+| Container build and image scan | **Skipped locally** — no reachable Docker daemon; built, smoke-tested and scanned in CI instead |
 
 Skips and limitations:
 
 - The Docker CLI is installed but the engine pipe
   (`npipe:////./pipe/dockerDesktopLinuxEngine`) is not available in this
-  workspace, so the image was never built here and no image scan was run.
-  The first real image build will be the Tekton `demo-build-image` task, or a
-  local `docker build` on a host with a working engine.
-- Local Trivy is `v0.76.2`, matching the version pinned in `ci/tasks/`. Trivy
-  misconfiguration coverage of kustomize *patches* is partial; the base
-  Deployment is fully scanned. The narrow suppressions are documented in
+  workspace, so the image was not built on this host. The PR workflow builds it
+  on `ubuntu-latest`, runs the same smoke checks against the container, and
+  gates on a Trivy image scan; that job is green on the current head commit. It
+  is still not the Tekton `demo-build-image`/`demo-scan-image` path.
+- Local Trivy is `v0.76.2`, matching the version pinned in `ci/` and the PR
+  workflow. Trivy misconfiguration coverage of kustomize *patches* is partial;
+  the base Deployment is fully scanned. The narrow suppressions are documented in
   [`.trivyignore.yaml`](../.trivyignore.yaml) and
   [`security-exceptions.md`](security-exceptions.md).
 - `kubectl apply --dry-run=client` was not used: kubectl 1.36 still contacts the
@@ -75,8 +77,9 @@ commands, tests or rendered YAML:
 2. **Pipeline-delivered demonstrator.** No Tekton PipelineRun has run. The
    `hde-pipelines` repository still contains scaffold files only, so the tasks
    referenced by `ci/pipeline.yaml` do not exist in the cluster.
-3. **Immutable image.** No image has been built, published or digest-pinned. The
-   overlay ships a deliberate placeholder digest that the pin task replaces.
+3. **Immutable image.** CI builds a throwaway image and scans it, but nothing is
+   published and no digest is recorded. The overlay ships a deliberate
+   placeholder digest that the pin task replaces.
 4. **Argo CD deployment.** No Application exists, so there is no sync revision,
    no sync result and no manual-sync identity on record.
 5. **Vault injection in the cluster.** The policy and annotations are written;
