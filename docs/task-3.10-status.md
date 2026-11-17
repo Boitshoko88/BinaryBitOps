@@ -122,6 +122,13 @@ pwsh ./scripts/verify.ps1
 Both scripts are read-only with respect to the cluster. They require Python 3.12+
 (kubectl and Trivy are optional and are reported as skipped when absent).
 
+## Presentation pack
+
+[`wbs-3.10-evidence-brief.md`](wbs-3.10-evidence-brief.md) is the slide-by-slide
+brief; [`wbs-3.10-evidence-deck.pptx`](wbs-3.10-evidence-deck.pptx) is the
+generated 14-slide deck with speaker notes. Both state the same gap list and the
+same completion decision as this record.
+
 ## Completion path
 
 Task 3.10 can be marked complete only when every row in
