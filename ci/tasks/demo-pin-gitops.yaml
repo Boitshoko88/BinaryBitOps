@@ -1,0 +1,116 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: demo-pin-gitops
+  labels:
+    app.kubernetes.io/part-of: hde-phase3
+spec:
+  description: >-
+    Pin the published digest in the GitOps overlay and push a branch. The task
+    never pushes to the protected branch and never merges: a human reviewer
+    approves the pull request and an authorised owner triggers the Argo CD sync.
+  params:
+    - name: gitops-url
+      type: string
+    - name: gitops-revision
+      type: string
+      default: main
+    - name: manifest-path
+      type: string
+      default: deploy/overlays/nonprod/patch-image.yaml
+    - name: image
+      type: string
+      description: Repository without a tag.
+    - name: digest
+      type: string
+      description: sha256 digest returned by the publish task.
+    - name: branch-prefix
+      type: string
+      default: gitops/binarybitops-demo
+    - name: git-user-name
+      type: string
+      default: hde-tekton-bot
+    - name: git-user-email
+      type: string
+      default: hde-tekton-bot@users.noreply.github.com
+  workspaces:
+    - name: scratch
+  results:
+    - name: branch
+      type: string
+    - name: pinned-image
+      type: string
+  steps:
+    - name: pin
+      image: alpine/git:2.47.2
+      env:
+        - name: GITOPS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: gitops-token
+              key: token
+              optional: true
+        - name: GITOPS_URL
+          value: $(params.gitops-url)
+        - name: IMAGE
+          value: $(params.image)
+        - name: DIGEST
+          value: $(params.digest)
+      workingDir: $(workspaces.scratch.path)
+      securityContext:
+        runAsUser: 0
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+        seccompProfile:
+          type: RuntimeDefault
+      script: |
+        #!/bin/sh
+        set -eu
+
+        : "${GITOPS_TOKEN:?gitops-token secret with key 'token' is required}"
+
+        case "$DIGEST" in
+          sha256:*) ;;
+          *) echo "refusing non-digest reference: $DIGEST" >&2; exit 1 ;;
+        esac
+
+        host_path="${GITOPS_URL#https://}"
+        rm -rf repo
+
+        # The token is provided by an askpass helper, never on the command line
+        # or in the clone URL, so it cannot leak through process listings/logs.
+        printf '#!/bin/sh\nprintf "%%s\\n" "$GITOPS_TOKEN"\n' > /tmp/askpass
+        chmod 700 /tmp/askpass
+
+        GIT_ASKPASS=/tmp/askpass GIT_TERMINAL_PROMPT=0 \
+          git -c credential.helper= \
+          clone --depth 1 --branch "$(params.gitops-revision)" \
+          "https://x-access-token@${host_path}" repo >/dev/null 2>&1
+
+        rm -f /tmp/askpass
+
+        manifest="repo/$(params.manifest-path)"
+        test -f "$manifest"
+
+        pinned="${IMAGE}@${DIGEST}"
+        before="$(grep -c '^[[:space:]]*image:' "$manifest" || true)"
+        test "$before" -eq 1
+
+        sed -i -E "s#^([[:space:]]*image:).*#\1 ${pinned}#" "$manifest"
+        grep -Fq "image: ${pinned}" "$manifest"
+
+        git -C repo config user.name "$(params.git-user-name)"
+        git -C repo config user.email "$(params.git-user-email)"
+
+        short="$(echo "$DIGEST" | cut -c8-19)"
+        branch="$(params.branch-prefix)-${short}"
+        git -C repo checkout -b "$branch"
+        git -C repo add "$(params.manifest-path)"
+        git -C repo commit -m "chore(gitops): pin binarybitops-demo to ${pinned}"
+        git -C repo push origin "$branch" >/dev/null 2>&1
+
+        printf '%s' "$branch" > "$(results.branch.path)"
+        printf '%s' "$pinned" > "$(results.pinned-image.path)"
+        echo "Branch ${branch} pushed with ${pinned}."
+        echo "A reviewer must open and approve the pull request before Argo CD sync."

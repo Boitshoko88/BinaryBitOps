@@ -1,0 +1,50 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: demo-unit-tests
+  labels:
+    app.kubernetes.io/part-of: hde-phase3
+spec:
+  description: Run the runtime test suite with the same Python minor version as the image.
+  params:
+    - name: python-image
+      type: string
+      default: python:3.12.8-alpine3.21
+  workspaces:
+    - name: source
+  results:
+    - name: tests-passed
+      type: string
+  steps:
+    - name: test
+      image: $(params.python-image)
+      workingDir: $(workspaces.source.path)
+      env:
+        - name: PYTHONDONTWRITEBYTECODE
+          value: "1"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+      computeResources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
+        limits:
+          cpu: 500m
+          memory: 256Mi
+          ephemeral-storage: 512Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+        seccompProfile:
+          type: RuntimeDefault
+      script: |
+        #!/bin/sh
+        set -eu
+        python -m unittest -v \
+          tests.test_bitops \
+          tests.test_hde_model \
+          tests.test_secrets \
+          tests.test_server \
+          tests.test_version
+        printf 'true' > "$(results.tests-passed.path)"

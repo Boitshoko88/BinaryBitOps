@@ -1,0 +1,80 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: demo-trivy-source
+  labels:
+    app.kubernetes.io/part-of: hde-phase3
+spec:
+  description: >-
+    Fail the pipeline on leaked credentials or on HIGH/CRITICAL source,
+    dependency and configuration findings. Writes a JSON report for evidence.
+  params:
+    - name: trivy-image
+      type: string
+      default: aquasec/trivy:0.76.2
+  workspaces:
+    - name: source
+  results:
+    - name: report-path
+      type: string
+  steps:
+    - name: scan
+      image: $(params.trivy-image)
+      workingDir: $(workspaces.source.path)
+      env:
+        - name: TRIVY_CACHE_DIR
+          value: /tmp/trivy-cache
+        - name: TRIVY_NO_PROGRESS
+          value: "true"
+      computeResources:
+        requests:
+          cpu: 200m
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 1Gi
+          ephemeral-storage: 2Gi
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+        seccompProfile:
+          type: RuntimeDefault
+      script: |
+        #!/bin/sh
+        set -eu
+
+        reports="$(workspaces.source.path)/reports"
+        mkdir -p "$reports"
+
+        # Evidence first, gate second, so a failed gate still leaves a report.
+        trivy fs \
+          --cache-dir "$TRIVY_CACHE_DIR" \
+          --scanners vuln,secret,misconfig \
+          --format json \
+          --output "$reports/trivy-source.json" \
+          --ignorefile .trivyignore.yaml \
+          --skip-dirs .git \
+          --skip-dirs reports \
+          . || true
+
+        trivy fs \
+          --cache-dir "$TRIVY_CACHE_DIR" \
+          --scanners secret \
+          --exit-code 1 \
+          --ignorefile .trivyignore.yaml \
+          --skip-dirs .git \
+          --skip-dirs reports \
+          .
+
+        trivy fs \
+          --cache-dir "$TRIVY_CACHE_DIR" \
+          --scanners vuln,misconfig \
+          --severity HIGH,CRITICAL \
+          --exit-code 1 \
+          --ignorefile .trivyignore.yaml \
+          --skip-dirs .git \
+          --skip-dirs reports \
+          .
+
+        printf '%s' "reports/trivy-source.json" > "$(results.report-path.path)"

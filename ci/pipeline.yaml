@@ -1,59 +1,146 @@
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
-  name: binarybitops-delivery
-  namespace: binarybitops-ci
+  name: binarybitops-demo-delivery
+  labels:
+    app.kubernetes.io/part-of: hde-phase3
+    app.kubernetes.io/version: "3.10"
 spec:
+  description: >-
+    WBS 3.10 demonstrator delivery. Tests and source scans gate the build; the
+    image scan gates publication; GitOps is updated on a branch for independent
+    approval and manual Argo CD sync.
   params:
+    - name: repo-url
+      type: string
+      default: https://github.com/Boitshoko88/BinaryBitOps.git
+    - name: revision
+      type: string
+      default: main
+    - name: image-repo
+      type: string
+      description: Registry repository without a tag.
     - name: image-tag
       type: string
+      description: Human-readable tag built from the commit SHA.
+    - name: version
+      type: string
+      default: 0.1.0
+    - name: gitops-url
+      type: string
+      default: https://github.com/Boitshoko88/BinaryBitOps.git
+    - name: gitops-revision
+      type: string
+      default: main
+    - name: gitops-manifest-path
+      type: string
+      default: deploy/overlays/nonprod/patch-image.yaml
+    - name: update-gitops
+      type: string
+      default: "false"
+      description: Set to "true" to push a digest-pinned GitOps branch.
   workspaces:
     - name: source
     - name: artifacts
+    - name: dockerconfig
+    - name: gitops-scratch
+  results:
+    - name: commit
+      type: string
+      value: $(tasks.fetch-source.results.commit)
+    - name: image
+      type: string
+      value: $(tasks.publish-image.results.digest)
   tasks:
-    - name: tests
+    - name: fetch-source
       taskRef:
-        name: python-tests
-      workspaces:
-        - name: source
-          workspace: source
-
-    - name: source-scan
-      runAfter: ["tests"]
-      taskRef:
-        name: source-scan
-      workspaces:
-        - name: source
-          workspace: source
-
-    - name: build
-      runAfter: ["source-scan"]
-      taskRef:
-        name: build-image
+        name: demo-git-clone
       params:
-        - name: image-tag
-          value: $(params.image-tag)
+        - name: url
+          value: $(params.repo-url)
+        - name: revision
+          value: $(params.revision)
+      workspaces:
+        - name: output
+          workspace: source
+
+    - name: unit-tests
+      runAfter: ["fetch-source"]
+      taskRef:
+        name: demo-unit-tests
+      workspaces:
+        - name: source
+          workspace: source
+
+    - name: trivy-source
+      runAfter: ["unit-tests"]
+      taskRef:
+        name: demo-trivy-source
+      workspaces:
+        - name: source
+          workspace: source
+
+    - name: build-image
+      runAfter: ["trivy-source"]
+      taskRef:
+        name: demo-build-image
+      params:
+        - name: image
+          value: $(params.image-repo):$(params.image-tag)
+        - name: version
+          value: $(params.version)
+        - name: git-sha
+          value: $(tasks.fetch-source.results.commit)
+        - name: build-date
+          value: $(context.pipelineRun.creationTimestamp)
       workspaces:
         - name: source
           workspace: source
         - name: artifacts
           workspace: artifacts
 
-    - name: image-scan
-      runAfter: ["build"]
+    - name: scan-image
+      runAfter: ["build-image"]
       taskRef:
-        name: image-scan
+        name: demo-scan-image
       workspaces:
         - name: artifacts
           workspace: artifacts
 
-    - name: publish
-      runAfter: ["image-scan"]
+    - name: publish-image
+      runAfter: ["scan-image"]
       taskRef:
-        name: publish-image
+        name: demo-publish-image
       params:
-        - name: image-tag
-          value: $(params.image-tag)
+        - name: image
+          value: $(params.image-repo):$(params.image-tag)
       workspaces:
         - name: artifacts
           workspace: artifacts
+        - name: dockerconfig
+          workspace: dockerconfig
+
+    - name: pin-gitops
+      runAfter: ["publish-image"]
+      when:
+        - input: $(params.update-gitops)
+          operator: in
+          values: ["true"]
+      taskRef:
+        name: demo-pin-gitops
+      params:
+        - name: gitops-url
+          value: $(params.gitops-url)
+        - name: gitops-revision
+          value: $(params.gitops-revision)
+        - name: manifest-path
+          value: $(params.gitops-manifest-path)
+        - name: image
+          value: $(params.image-repo)
+        - name: digest
+          value: $(tasks.publish-image.results.digest)
+        - name: branch-prefix
+          value: gitops/binarybitops-demo
+      workspaces:
+        - name: scratch
+          workspace: gitops-scratch
