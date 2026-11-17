@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: binarybitops-demo
+spec:
+  template:
+    metadata:
+      annotations:
+        # Vault Agent Injector (WBS 3.8). The injector renders the secret into
+        # the pod filesystem; the application never receives a Vault token.
+        # If the injector is not installed these annotations are ignored and the
+        # workload still starts because REQUIRE_VAULT_INJECTION is "false".
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/agent-inject-status: "update"
+        vault.hashicorp.com/agent-pre-populate-only: "true"
+        vault.hashicorp.com/role: "binarybitops-demo"
+        vault.hashicorp.com/agent-inject-secret-demo.json: "secret/data/hde/nonprod/binarybitops-demo"
+        vault.hashicorp.com/agent-inject-template-demo.json: |
+          {{- with secret "secret/data/hde/nonprod/binarybitops-demo" -}}
+          {"demo-api-key":"{{ .Data.data.demo_api_key }}","rotation_epoch":"{{ .Data.data.rotation_epoch }}"}
+          {{- end }}

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: binarybitops-demo-config
+  labels:
+    app.kubernetes.io/name: binarybitops-demo
+data:
+  DEMO_ENV: nonprod
+  DEMO_RELEASE: wbs-3.10
+  # The workload proves Vault injection when 3.8 is available. Flip to "true"
+  # in the environment overlay only after the Vault Agent Injector is installed.
+  REQUIRE_VAULT_INJECTION: "false"
+  VAULT_INJECTED_FILE: /vault/secrets/demo.json

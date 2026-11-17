@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: binarybitops-demo
+  labels:
+    app.kubernetes.io/name: binarybitops-demo
+    app.kubernetes.io/part-of: hde-phase3
+    hde.binarybit.tech/environment: nonprod
+    # Enforce the restricted Pod Security Standard for the demonstrator.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

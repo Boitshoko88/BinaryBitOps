@@ -3,14 +3,44 @@ kind: AppProject
 metadata:
   name: binarybitops-demo
   namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: hde-phase3
 spec:
-  description: BinaryBitOps demonstration deployment
+  description: >-
+    WBS 3.10 non-production demonstrator. Restricted to the demo namespace and
+    the GitOps repository paths approved for this workload.
   sourceRepos:
-    - https://github.com/mahlatse932/BinaryBitOps.git
+    - https://github.com/Boitshoko88/BinaryBitOps.git
+    - https://github.com/Hybrid-Envionment-Project/binarybit-ops.git
   destinations:
-    - namespace: binarybitops-demo
-      server: https://kubernetes.default.svc
-  clusterResourceWhitelist: []
+    - server: https://kubernetes.default.svc
+      namespace: binarybitops-demo
+  # The namespace is applied once by the platform owner. Remove this entry if
+  # the cluster already provides the namespace and Argo CD must not own it.
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
   namespaceResourceWhitelist:
-    - group: batch
-      kind: Job
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ServiceAccount
+    - group: ""
+      kind: ConfigMap
+    - group: apps
+      kind: Deployment
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+    - group: policy
+      kind: PodDisruptionBudget
+    - group: monitoring.coreos.com
+      kind: ServiceMonitor
+  orphanedResources:
+    warn: true
+  roles:
+    - name: demo-readonly
+      description: Read-only view for reviewers
+      policies:
+        - p, proj:binarybitops-demo:demo-readonly, applications, get, binarybitops-demo/*, allow
+      groups:
+        - hde-reviewers

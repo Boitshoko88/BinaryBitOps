@@ -1,0 +1,21 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: binarybitops-demo
+  labels:
+    app.kubernetes.io/name: binarybitops-demo
+    # Matches the kube-prometheus-stack ServiceMonitor selector.
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - binarybitops-demo
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: binarybitops-demo
+  endpoints:
+    - port: http
+      path: /metrics
+      scheme: http
+      interval: 30s
+      scrapeTimeout: 10s

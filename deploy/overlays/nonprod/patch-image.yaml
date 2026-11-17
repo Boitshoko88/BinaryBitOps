@@ -1,0 +1,12 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: binarybitops-demo
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          # The Tekton publish task rewrites this line to
+          # <registry>/binarybitops-demo@sha256:<digest> through an approved PR.
+          image: 445137568300.dkr.ecr.eu-north-1.amazonaws.com/binarybitops-demo:0.1.0
