@@ -43,7 +43,8 @@ does not authorise a migration of the live application. See
 - `pwsh -File scripts/verify.ps1` (or `sh scripts/verify.sh`)
 - Trivy filesystem and image scans
 
-Evidence: `evidence/local/local-verification.md` plus the CI run for this PR.
+Evidence: `docs/task-3.10-status.md`, the local record from
+`scripts/verify.ps1`, and the "PR check" run attached to this pull request.
 
 ## Out of scope / not yet evidenced
 

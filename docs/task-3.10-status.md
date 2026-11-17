@@ -69,8 +69,9 @@ Skips and limitations:
 These are the WBS acceptance items. None of them can be satisfied by local
 commands, tests or rendered YAML:
 
-1. **Reviewed code and approved PR.** The branch is authored by the same person
-   who would have to approve it; independent review is outstanding.
+1. **Reviewed code and approved PR.** [PR #1](https://github.com/Boitshoko88/BinaryBitOps/pull/1)
+   is open, but the branch is authored by the same person who would have to
+   approve it; independent review is outstanding.
 2. **Pipeline-delivered demonstrator.** No Tekton PipelineRun has run. The
    `hde-pipelines` repository still contains scaffold files only, so the tasks
    referenced by `ci/pipeline.yaml` do not exist in the cluster.
@@ -95,7 +96,7 @@ bypass that rule; it only prepares the artefacts.
 
 | # | Action | Owner | Blocked by |
 | --- | --- | --- | --- |
-| 1 | Open PR from `feature/task-3.10-demonstrator` and obtain independent review | Nomhle | — |
+| 1 | Obtain independent review on [PR #1](https://github.com/Boitshoko88/BinaryBitOps/pull/1) | Nomhle | — |
 | 2 | Protect the default branch: required review, required checks, no force-push | Manqoba | 3.6 |
 | 3 | Install Tekton tasks and Trivy from `ci/`, then run the PipelineRun | Reitumetse | 3.9 |
 | 4 | Publish the image and record the immutable digest | Manqoba | registry access, 3.9 |
