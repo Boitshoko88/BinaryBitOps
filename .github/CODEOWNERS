@@ -1,0 +1,8 @@
+# Replace the placeholder with the approved HDE reviewer group once GitHub team
+# membership is confirmed. Keeping this file unenforced is safer than pointing
+# at a group that does not exist.
+#
+# * @Hybrid-Envionment-Project/hde-reviewers
+# deploy/  @Hybrid-Envionment-Project/hde-platform
+# ci/      @Hybrid-Envionment-Project/hde-platform
+# vault/   @Hybrid-Envionment-Project/hde-security
