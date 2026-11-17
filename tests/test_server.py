@@ -5,7 +5,9 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
+from unittest import mock
 
+from binarybitops import server as server_module
 from binarybitops.server import DemoConfig, build_state, create_server
 from binarybitops.version import BuildInfo
 
@@ -199,6 +201,30 @@ class ServerTests(unittest.TestCase):
                     connection.request("GET", route)
                     self.assertEqual(connection.getresponse().status, expected)
                     connection.close()
+
+    def test_main_binds_the_configured_host(self):
+        captured = {}
+
+        def fake_create(config=None, app=None, build=None, host="127.0.0.1", port=None):
+            captured["host"] = host
+            return mock.MagicMock()
+
+        with mock.patch.object(server_module, "create_server", fake_create), \
+                mock.patch.object(server_module, "_serve", lambda srv: None):
+            self.assertEqual(server_module.main({"HOST": "0.0.0.0", "DEMO_ENV": "test"}), 0)
+        self.assertEqual(captured["host"], "0.0.0.0")
+
+    def test_main_defaults_to_all_interfaces(self):
+        captured = {}
+
+        def fake_create(config=None, app=None, build=None, host="127.0.0.1", port=None):
+            captured["host"] = host
+            return mock.MagicMock()
+
+        with mock.patch.object(server_module, "create_server", fake_create), \
+                mock.patch.object(server_module, "_serve", lambda srv: None):
+            self.assertEqual(server_module.main({"DEMO_ENV": "test"}), 0)
+        self.assertEqual(captured["host"], "0.0.0.0")
 
 
 if __name__ == "__main__":

@@ -528,7 +528,7 @@ def main(env: Mapping[str, str] | None = None) -> int:
         }, separators=(",", ":")), flush=True)
         return 1
 
-    server = create_server(config=config, app=state)
+    server = create_server(config=config, app=state, host=config.host)
     try:
         _serve(server)
     finally:

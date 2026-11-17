@@ -25,7 +25,7 @@ database connection or credentials. See
 | --- | --- | --- |
 | Demonstrator service (HTTP `/healthz`, `/readyz`, `/version`, `/api/bitops`, `/api/status`, `/metrics`, `/`) | Implemented | `binarybitops/` |
 | Prior CLI / environment model preserved | Implemented | `binarybitops.py` |
-| Test suite | 75 tests, all passing | `tests/` |
+| Test suite | 77 tests, all passing | `tests/` |
 | Hardened container image definition | Written; build not executed locally | `Dockerfile` |
 | Kubernetes base + non-production overlay | Rendered and schema-validated locally | `deploy/` |
 | Tekton pipeline and tasks | Written; never executed on a cluster | `ci/` |
@@ -42,7 +42,7 @@ contains host and timestamp data; regenerate it on the reviewing machine.
 
 | Check | Result |
 | --- | --- |
-| `python -m unittest discover -s tests -t .` | 75 tests, exit 0 |
+| `python -m unittest discover -s tests -t .` | 77 tests, exit 0 |
 | `kubectl kustomize deploy/overlays/nonprod` | 9 resources rendered |
 | kubeconform `-strict` | 8 valid, 0 invalid, 1 skipped (ServiceMonitor CRD) |
 | Trivy fs (`vuln,secret,misconfig`, HIGH/CRITICAL) | 0 HIGH/CRITICAL, 0 secrets |

@@ -92,10 +92,16 @@ jobs:
           docker run -d --name demo -p 8080:8080 \
             -e DEMO_ENV=pr -e DEMO_RELEASE=${{ github.sha }} \
             binarybitops-demo:pr-${{ github.sha }}
+          ready=0
           for attempt in $(seq 1 20); do
-            if curl -fsS http://127.0.0.1:8080/healthz >/dev/null; then break; fi
+            if curl -fsS http://127.0.0.1:8080/healthz >/dev/null 2>&1; then ready=1; break; fi
             sleep 1
           done
+          if [ "$ready" -ne 1 ]; then
+            echo "service did not become ready; container log follows" >&2
+            docker logs demo || true
+            exit 1
+          fi
           curl -fsS http://127.0.0.1:8080/healthz
           curl -fsS "http://127.0.0.1:8080/api/bitops?left=12&right=10" | tee "$RUNNER_TEMP/bitops.json"
           grep -q '"and":8' "$RUNNER_TEMP/bitops.json"
