@@ -1,0 +1,2 @@
+# Development-only dependencies. The runtime image has no third-party packages.
+PyYAML==6.0.3
