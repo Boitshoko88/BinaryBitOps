@@ -3,12 +3,31 @@ kind: Application
 metadata:
   name: binarybitops-demo
   namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: hde-phase3
+    hde.binarybit.tech/environment: nonprod
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: binarybitops-demo
   source:
-    repoURL: https://github.com/mahlatse932/BinaryBitOps.git
+    repoURL: https://github.com/Boitshoko88/BinaryBitOps.git
     targetRevision: main
-    path: gitops
+    path: deploy/overlays/nonprod
   destination:
     server: https://kubernetes.default.svc
     namespace: binarybitops-demo
+  # Deliberately manual: the deployment-approval record is the human sync.
+  # No automated sync or self-heal is configured.
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=false
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 2
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 5

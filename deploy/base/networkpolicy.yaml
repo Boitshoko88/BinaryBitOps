@@ -1,0 +1,48 @@
+# Default-deny for every pod in the namespace. Ingress is granted only from the
+# approved ingress controller and monitoring namespace; egress is limited to DNS.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: binarybitops-demo-default-deny
+  labels:
+    app.kubernetes.io/name: binarybitops-demo
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: binarybitops-demo-allow
+  labels:
+    app.kubernetes.io/name: binarybitops-demo
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: binarybitops-demo
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

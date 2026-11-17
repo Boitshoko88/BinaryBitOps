@@ -1,0 +1,120 @@
+name: PR check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "feature/**"
+      - "fix/**"
+      - "hotfix/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests-and-manifests:
+    name: Tests and manifests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install development dependencies
+        run: pip install --no-cache-dir -r requirements-dev.txt
+
+      - name: Unit and manifest tests
+        run: python -m unittest discover -s tests -t . -v
+
+      - name: CLI model view
+        run: python binarybitops.py
+
+      - name: Render non-production overlay
+        run: |
+          set -euo pipefail
+          kubectl kustomize deploy/overlays/nonprod > "$RUNNER_TEMP/rendered.yaml"
+          grep -q 'kind: Deployment' "$RUNNER_TEMP/rendered.yaml"
+          grep -q 'kind: NetworkPolicy' "$RUNNER_TEMP/rendered.yaml"
+          grep -q 'readOnlyRootFilesystem: true' "$RUNNER_TEMP/rendered.yaml"
+
+      - name: Validate Kubernetes schemas
+        run: |
+          set -euo pipefail
+          curl -sSLo "$RUNNER_TEMP/kubeconform.tar.gz" \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar -xzf "$RUNNER_TEMP/kubeconform.tar.gz" -C "$RUNNER_TEMP"
+          "$RUNNER_TEMP/kubeconform" -strict -summary -ignore-missing-schemas \
+            "$RUNNER_TEMP/rendered.yaml"
+
+      - name: Trivy source, secret and configuration scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: v0.76.2
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: false
+          trivyignores: .trivyignore.yaml
+          skip-dirs: .git,tools,evidence
+
+  container:
+    name: Container build and image scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: binarybitops-demo:pr-${{ github.sha }}
+          build-args: |
+            VERSION=0.1.0
+            GIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
+
+      - name: Container smoke test
+        run: |
+          set -euo pipefail
+          docker run -d --name demo -p 8080:8080 \
+            -e DEMO_ENV=pr -e DEMO_RELEASE=${{ github.sha }} \
+            binarybitops-demo:pr-${{ github.sha }}
+          ready=0
+          for attempt in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8080/healthz >/dev/null 2>&1; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "service did not become ready; container log follows" >&2
+            docker logs demo || true
+            exit 1
+          fi
+          curl -fsS http://127.0.0.1:8080/healthz
+          curl -fsS "http://127.0.0.1:8080/api/bitops?left=12&right=10" | tee "$RUNNER_TEMP/bitops.json"
+          grep -q '"and":8' "$RUNNER_TEMP/bitops.json"
+          curl -fsS http://127.0.0.1:8080/ | grep -q 'not the Binary Bit Ops/Nexus application'
+          curl -fsS http://127.0.0.1:8080/metrics | grep -q 'binarybitops_build_info'
+          docker rm -f demo
+
+      - name: Trivy image scan gate
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: v0.76.2
+          scan-type: image
+          image-ref: binarybitops-demo:pr-${{ github.sha }}
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: false

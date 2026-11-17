@@ -1,5 +1,34 @@
+# Runtime and local verification
 __pycache__/
 *.py[cod]
+.venv/
+venv/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Local environment and secrets (never commit)
 .env
 .env.*
+!.env.example
 *.pem
+*.key
+kubeconfig
+kubeconfig.*
+.vault-token
+
+# Generated evidence and build output
+evidence/local/local-verification.md
+build/
+dist/
+tools/
+*.tar
+*.sarif
+rendered.yaml
+out/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

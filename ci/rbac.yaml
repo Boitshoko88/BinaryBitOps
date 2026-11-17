@@ -1,0 +1,11 @@
+# The demo pipeline does not call the Kubernetes API from its pods; this
+# ServiceAccount exists so the PipelineRun has an explicit, non-default identity
+# with no bound roles. Registry and GitOps credentials come from the mounted
+# secrets named in the PipelineRun, not from this account.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: binarybitops-demo-pipeline
+  labels:
+    app.kubernetes.io/part-of: hde-phase3
+automountServiceAccountToken: false

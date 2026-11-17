@@ -1,0 +1,63 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: demo-scan-image
+  labels:
+    app.kubernetes.io/part-of: hde-phase3
+spec:
+  description: >-
+    Trivy image gate. The image is published only if no HIGH or CRITICAL
+    vulnerabilities are found. A JSON report is retained as evidence.
+  params:
+    - name: trivy-image
+      type: string
+      default: aquasec/trivy:0.76.2
+  workspaces:
+    - name: artifacts
+  results:
+    - name: report-path
+      type: string
+  steps:
+    - name: scan
+      image: $(params.trivy-image)
+      env:
+        - name: TRIVY_CACHE_DIR
+          value: /tmp/trivy-cache
+        - name: TRIVY_NO_PROGRESS
+          value: "true"
+      computeResources:
+        requests:
+          cpu: 200m
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 1Gi
+          ephemeral-storage: 3Gi
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+        seccompProfile:
+          type: RuntimeDefault
+      script: |
+        #!/bin/sh
+        set -eu
+
+        image_tar="$(workspaces.artifacts.path)/image.tar"
+        report="$(workspaces.artifacts.path)/trivy-image.json"
+
+        trivy image \
+          --input "$image_tar" \
+          --cache-dir "$TRIVY_CACHE_DIR" \
+          --scanners vuln,secret \
+          --format json \
+          --output "$report" >/dev/null 2>&1 || true
+
+        trivy image \
+          --input "$image_tar" \
+          --cache-dir "$TRIVY_CACHE_DIR" \
+          --scanners vuln,secret \
+          --severity HIGH,CRITICAL \
+          --exit-code 1
+
+        printf '%s' "trivy-image.json" > "$(results.report-path.path)"

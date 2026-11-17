@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Non-production overlay for the WBS 3.10 demonstrator. Argo CD renders this
+# path. The image is pinned by digest by the Tekton `pin-gitops` task after the
+# scan gate passes; a tag here is a pre-release placeholder only.
+resources:
+  - ../../base
+  - ../../observability
+
+patches:
+  - path: patch-image.yaml
+  - path: patch-vault.yaml
+  - path: patch-pull-secret.yaml

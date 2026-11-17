@@ -1,0 +1,54 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: demo-git-clone
+  labels:
+    app.kubernetes.io/part-of: hde-phase3
+spec:
+  description: Clone the demonstrator repository at an immutable revision.
+  params:
+    - name: url
+      type: string
+      description: Repository URL (HTTPS).
+    - name: revision
+      type: string
+      default: main
+      description: Branch, tag or full commit SHA.
+  workspaces:
+    - name: output
+      description: Workspace that receives the source tree.
+  results:
+    - name: commit
+      type: string
+      description: Full commit SHA that was checked out.
+  steps:
+    - name: clone
+      image: alpine/git:2.47.2
+      workingDir: $(workspaces.output.path)
+      env:
+        - name: REPO_URL
+          value: $(params.url)
+        - name: REVISION
+          value: $(params.revision)
+      securityContext:
+        runAsUser: 0
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+        seccompProfile:
+          type: RuntimeDefault
+      script: |
+        #!/bin/sh
+        set -eu
+
+        # Start from an empty workspace so a rerun cannot mix revisions.
+        find . -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+
+        git init -q .
+        git remote add origin "$REPO_URL"
+        git fetch --depth 1 origin "$REVISION"
+        git checkout -q --detach FETCH_HEAD
+
+        commit="$(git rev-parse HEAD)"
+        printf '%s' "$commit" > "$(results.commit.path)"
+        echo "Checked out ${REPO_URL} at ${commit}"

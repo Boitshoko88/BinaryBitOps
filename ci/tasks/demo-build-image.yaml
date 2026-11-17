@@ -1,0 +1,76 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: demo-build-image
+  labels:
+    app.kubernetes.io/part-of: hde-phase3
+spec:
+  description: >-
+    Build the image without pushing, producing a local tar for the scan gate.
+    Kaniko runs as root inside this isolated build pod only; the workload itself
+    runs as UID 10001. See docs/security-exceptions.md.
+  params:
+    - name: image
+      type: string
+      description: Full destination reference, used to name the tar.
+    - name: version
+      type: string
+      default: 0.1.0
+    - name: git-sha
+      type: string
+    - name: build-date
+      type: string
+  workspaces:
+    - name: source
+    - name: artifacts
+  results:
+    - name: image-tar
+      type: string
+  steps:
+    - name: build
+      image: gcr.io/kaniko-project/executor:v1.23.2
+      args:
+        - --context=$(workspaces.source.path)
+        - --dockerfile=$(workspaces.source.path)/Dockerfile
+        - --destination=$(params.image)
+        - --no-push
+        - --tar-path=$(workspaces.artifacts.path)/image.tar
+        - --snapshot-mode=redo
+        - --reproducible
+        - --compressed-caching=false
+        - --cleanup
+        - --label=org.opencontainers.image.version=$(params.version)
+        - --label=org.opencontainers.image.revision=$(params.git-sha)
+        - --label=org.opencontainers.image.created=$(params.build-date)
+        - --build-arg=VERSION=$(params.version)
+        - --build-arg=GIT_SHA=$(params.git-sha)
+        - --build-arg=BUILD_DATE=$(params.build-date)
+      computeResources:
+        requests:
+          cpu: 500m
+          memory: 512Mi
+        limits:
+          cpu: "2"
+          memory: 2Gi
+          ephemeral-storage: 4Gi
+      securityContext:
+        runAsUser: 0
+        allowPrivilegeEscalation: false
+        seccompProfile:
+          type: RuntimeDefault
+    - name: verify-tar
+      image: busybox:1.37.0
+      args:
+        - sh
+        - -c
+        - |
+          set -eu
+          test -s "$(workspaces.artifacts.path)/image.tar"
+          ls -lh "$(workspaces.artifacts.path)/image.tar"
+          printf '%s' "image.tar" > "$(results.image-tar.path)"
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+        seccompProfile:
+          type: RuntimeDefault

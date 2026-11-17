@@ -1,25 +1,56 @@
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
-  name: delivery-1ab7ca0-demo-01
-  namespace: binarybitops-ci
+  generateName: binarybitops-demo-
+  labels:
+    app.kubernetes.io/part-of: hde-phase3
+    app.kubernetes.io/version: "3.10"
+    hde.binarybit.tech/environment: nonprod
 spec:
   pipelineRef:
-    name: binarybitops-delivery
-  params:
-    - name: image-tag
-      value: 1ab7ca0-demo-01
+    name: binarybitops-demo-delivery
+  serviceAccountName: binarybitops-demo-pipeline
   timeouts:
-    pipeline: 30m
-    tasks: 25m
+    pipeline: 1h
   taskRunTemplate:
     podTemplate:
       securityContext:
-        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+  params:
+    - name: repo-url
+      value: https://github.com/Boitshoko88/BinaryBitOps.git
+    # Replace with the approved commit SHA before an evidence run.
+    - name: revision
+      value: main
+    - name: image-repo
+      value: 445137568300.dkr.ecr.eu-north-1.amazonaws.com/binarybitops-demo
+    # Use the commit SHA so the tag is traceable; the digest is the real pin.
+    - name: image-tag
+      value: "REPLACE_WITH_COMMIT_SHA"
+    - name: version
+      value: "0.1.0"
+    - name: update-gitops
+      value: "false"
   workspaces:
     - name: source
-      configMap:
-        name: source-1ab7ca0
+      persistentVolumeClaim:
+        claimName: binarybitops-ci-source
     - name: artifacts
       persistentVolumeClaim:
-        claimName: build-workspace
+        claimName: binarybitops-ci-artifacts
+    - name: gitops-scratch
+      persistentVolumeClaim:
+        claimName: binarybitops-ci-gitops
+    # Create this from the approved registry credential (see docs/runbook.md).
+    - name: dockerconfig
+      secret:
+        secretName: ecr-push-auth
+  # Required for `update-gitops=true`; create from Vault-managed credentials.
+  # podTemplate:
+  #   env:
+  #     - name: GITOPS_TOKEN
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: gitops-token
+  #           key: token

@@ -1,0 +1,60 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: demo-publish-image
+  labels:
+    app.kubernetes.io/part-of: hde-phase3
+spec:
+  description: >-
+    Push the scanned tar and record the immutable digest consumed by GitOps.
+    Credentials are mounted from a Kubernetes secret supplied by the platform.
+  params:
+    - name: image
+      type: string
+  workspaces:
+    - name: artifacts
+    - name: dockerconfig
+  results:
+    - name: digest
+      type: string
+      description: Immutable sha256 digest of the published image.
+  steps:
+    - name: publish
+      image: gcr.io/go-containerregistry/crane:v0.20.2
+      env:
+        - name: IMAGE
+          value: $(params.image)
+        - name: DOCKER_CONFIG
+          value: /tmp/docker
+      computeResources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+          ephemeral-storage: 1Gi
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+        seccompProfile:
+          type: RuntimeDefault
+      script: |
+        #!/bin/sh
+        set -eu
+
+        mkdir -p /tmp/docker
+        cp "$(workspaces.dockerconfig.path)/.dockerconfigjson" /tmp/docker/config.json
+        chmod 600 /tmp/docker/config.json
+
+        crane push "$(workspaces.artifacts.path)/image.tar" "$IMAGE"
+        digest="$(crane digest "$IMAGE")"
+
+        case "$digest" in
+          sha256:*) ;;
+          *) echo "unexpected digest format: $digest" >&2; exit 1 ;;
+        esac
+
+        printf '%s' "$digest" > "$(results.digest.path)"
+        echo "Published ${IMAGE}@${digest}"
