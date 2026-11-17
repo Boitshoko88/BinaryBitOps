@@ -30,6 +30,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Take package fixes published after the base tag was built. The image scan gate
+# fails on any HIGH/CRITICAL finding that has a fixed version, so a stale base
+# cannot pass silently.
+RUN apk upgrade --no-cache
+
 # Fixed, non-root runtime identity shared by the image, manifests and tests.
 # The runtime has no third-party packages, so pip and setuptools are removed to
 # shrink the scanned attack surface.
