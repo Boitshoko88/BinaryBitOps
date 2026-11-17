@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM python:3.12.8-alpine3.21
+FROM python:3.12-alpine3.24
 
 ARG VERSION=0.1.0
 ARG GIT_SHA=unknown
@@ -31,8 +31,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Fixed, non-root runtime identity shared by the image, manifests and tests.
+# The runtime has no third-party packages, so pip and setuptools are removed to
+# shrink the scanned attack surface.
 RUN addgroup -g 10001 -S app \
-    && adduser -u 10001 -S -D -H -G app -s /sbin/nologin app
+    && adduser -u 10001 -S -D -H -G app -s /sbin/nologin app \
+    && (python -m pip uninstall -y pip setuptools wheel >/dev/null 2>&1 || true)
 
 COPY --chown=10001:10001 binarybitops.py /app/binarybitops.py
 COPY --chown=10001:10001 binarybitops/ /app/binarybitops/
